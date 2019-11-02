@@ -107,10 +107,30 @@ class AtcGym(gym.Env):
         """
 
         # self._airplane = model.Airplane(self._sim_parameters, 0, 10, 16000, 90, 250)
-        self._airplane = model.Airplane(self._sim_parameters, 5, 10, 1600, 90, 250)
+        self._airplane = model.Airplane(self._sim_parameters, 0, 10, 16000, 90, 250)
 
-        return np.array([self._airplane.x, self._airplane.y, self._airplane.h, self._airplane.phi, self._airplane.v, self._airspace.get_mva(self._airplane.x, self._airplane.y), 
-            8, self._corridor.faf_angle, self._runway.phi_from_runway])
+        try:
+            mva = self._airspace.get_mva(self._airplane.x, self._airplane.y)
+
+            if self._airplane.h < mva:
+                done = True
+                reward = -100
+        except ValueError:
+            # Airplane has left the airspace
+            done = True
+            reward = -100
+            mva = 0  # dummy value outside of range so that the MVA is set for the last state
+
+        to_faf_x = self._corridor.faf[0] - self._airplane.x
+        to_faf_y = self._corridor.faf[1] - self._airplane.y
+        d_faf = np.hypot(to_faf_x, to_faf_y)
+        phi_rel_faf = np.arctan2(to_faf_y, to_faf_x)
+        phi_rel_runway = model.relative_angle(self._runway.phi_to_runway, self._airplane.phi)
+        state = np.array([self._airplane.x, self._airplane.y, self._airplane.h, self._airplane.phi,
+                          self._airplane.v, self._airplane.h - mva, d_faf, phi_rel_faf, phi_rel_runway],
+                         dtype=np.float32)
+
+        return state
 
     def render(self, mode='human'):
         """
