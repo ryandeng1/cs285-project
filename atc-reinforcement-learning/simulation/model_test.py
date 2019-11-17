@@ -1,7 +1,7 @@
 import unittest
 import shapely.geometry as shape
-import simulation.model as model
-
+#import simulation.model as model
+import model
 
 class MyTestCase(unittest.TestCase):
 
