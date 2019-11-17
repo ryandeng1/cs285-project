@@ -1,4 +1,4 @@
-from const import Const
+from simulation.const import Const
 import math, random
 import numpy as np
 import math
@@ -43,8 +43,13 @@ class AirplaneSimulator(gym.Env):
             self.state = self.create_initial_state_motion_y(init_discrete_state)
             self.discrete_state = self.get_discrete_state(self.state)
             self.end_state_flag = self.is_end_state(self.state)
-    
-    def create_initial_state(self):
+
+        self.observation_space = gym.spaces.Box(low=np.array([Const.T_MIN, Const.Y_MIN, Const.Z_MIN, Const.VY_MIN, Const.VZ_MIN, Const.VW_MIN]), 
+            high=np.array([Const.T_MAX, Const.Y_MAX, Const.Z_MAX, Const.VY_MAX, Const.VZ_MAX, Const.VW_MAX]))
+        self.action_space = gym.spaces.Box(low=np.array([Const.DELTA_VY_MIN, Const.DELTA_VZ_MIN]), 
+            high=np.array([Const.DELTA_VY_MAX, Const.DELTA_VZ_MAX]))
+
+    def create_initial_state(self): 
         '''
         Method to initialize the starting state
         '''        
@@ -53,8 +58,22 @@ class AirplaneSimulator(gym.Env):
             f = -1
         else:
             f = 1
-        return [Const.START_T , Const.START_Y, Const.START_Z, \
-                Const.START_VY, Const.START_VZ, f * Const.START_VW]
+        return np.array([Const.START_T , Const.START_Y, Const.START_Z, \
+                Const.START_VY, Const.START_VZ, f * Const.START_VW])
+
+
+    def reset(self):
+        return self.create_initial_state()
+
+
+    def step(self, action):
+        curr_state = self.state
+        self.update_state(action)
+        next_state = self.state
+        reward = self.get_reward(curr_state, next_state)
+        done = self.is_end_state(next_state)
+        return next_state, reward, done, {}
+
     
     def get_state_bin_sizes(self):
         '''
@@ -300,7 +319,7 @@ class AirplaneSimulator(gym.Env):
             self.snap_to_bounds(next_v_w, Const.VW_MIN, Const.VW_MAX)
             
             # Update state
-            self.state = [next_t, next_y, next_z, next_v_y, next_v_z, next_v_w]
+            self.state = np.array([next_t, next_y, next_z, next_v_y, next_v_z, next_v_w])
             self.discrete_state = self.get_discrete_state(self.state)
             self.end_state_flag = self.is_end_state(self.state)
             
@@ -377,8 +396,8 @@ class AirplaneSimulator(gym.Env):
             
         if plane_outside_radar == True or plane_crash == True \
             or plane_missed_landing == True or plane_land == True:
-            print ("Control never reaches here - plane already outside radar / crashed / landed / missed landing.")
-            return None
+            # print ("Control never reaches here - plane already outside radar / crashed / landed / missed landing.")
+            return -100 #None
         
         def penalty_dv(vy1, vy2, vz1, vz2):
             '''
@@ -419,8 +438,8 @@ class AirplaneSimulator(gym.Env):
         else:
             # If landing missed
             if plane_land == False:
-                print ("Control should not reach here...plane should have safely landed.")
-                return None
+                #print ("Control should not reach here...plane should have safely landed.")
+                return -100 #None
             # If landing has happened
             else:
                 return p_dv + Const.PENALTY_RUNWAY * math.pow(next_y, 2) + Const.LANDING_REWARD

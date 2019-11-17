@@ -119,21 +119,8 @@ class AtcGym(gym.Env):
         self._airplane = model.Airplane(self._sim_parameters, "FLT01", 5, 5, 16000, 90, 250)
         try:
             mva = self._airspace.get_mva_height(self._airplane.x, self._airplane.y)
-
-            if self._airplane.h < mva:
-                done = True
-                reward = -100
         except ValueError:
-            # Airplane has left the airspace
-            done = True
-            reward = -100
-            mva = 0  # dummy value outside of range so that the MVA is set for the last state
-
-        if self._runway.inside_corridor(self._airplane.x, self._airplane.y, self._airplane.h, self._airplane.phi):
-            # GAME WON!
-            reward = 100
-            done = True
-
+            mva = 0
         # observation space: x, y, h, phi, v, h-mva, d_faf, phi_rel_faf, phi_rel_runway
         # FIXME calculate relative angle to FAF phi_rel_faf
         to_faf_x = self._runway.corridor.faf[0][0] - self._airplane.x
