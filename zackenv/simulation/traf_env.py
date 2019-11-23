@@ -18,8 +18,8 @@ class AirTrafficGym(gym.Env):
         self.vmax = vmax
         self.time_elapsed = 0
         # heading, v
-        # self.action_space = gym.spaces.Discrete(3) # gym.spaces.MultiDiscrete([4, 3])
-        self.action_space = gym.spaces.Box(low=np.array([-1,-airplane['dtheta']]), high=np.array([1,airplane['dtheta']]))
+        self.action_space = gym.spaces.Discrete(3) # gym.spaces.MultiDiscrete([4, 3])
+        # self.action_space = gym.spaces.Box(low=np.array([-1,-airplane['dtheta']]), high=np.array([1,airplane['dtheta']]))
         # x, y, hdg, v
         self.observation_space = gym.spaces.Box(
             low=np.array([self._airspace.bounds[0], self._airspace.bounds[1], 0, vmin]),
@@ -34,11 +34,11 @@ class AirTrafficGym(gym.Env):
 
         # update airplane_position
         # if np.argmax(action[:3]) == 0:
-        # if action == 0:
-        #     self._airplane['v'] -= self._airplane['dv']
+        if action == 0:
+            self._airplane['v'] -= self._airplane['dv']
         # elif np.argmax(action[:3]) == 1:
-        # elif action == 1:
-        #     self._airplane['v'] += self._airplane['dv']
+        elif action == 1:
+            self._airplane['v'] += self._airplane['dv']
         '''
         if action[0] == 0:
             self._airplane['theta'] -= self._airplane['dtheta']
@@ -54,11 +54,11 @@ class AirTrafficGym(gym.Env):
             self._airplane['v'] = self.vmax
 
         # action[1] = min(self._airplane['dtheta'], action[1]) if action[1] > 0 else max(self._airplane['dtheta'], action[1])
-        ideal_dtheta = closed_form_autopilot(self._airplane['x'],self._airplane['y'], self._airplane['theta'], self._airplane['v'], self._airplane['dtheta'])
-        reward -= 100*np.abs(action[1]-ideal_dtheta)
-        reward = max(-100, reward)
+        self._airplane['theta'] += closed_form_autopilot(self._airplane['x'],self._airplane['y'], self._airplane['theta'], self._airplane['v'], self._airplane['dtheta'])
+        # reward -= 100*np.abs((action[1]-ideal_dtheta)/self._airplane['dtheta'])
+        # reward = max(-100, reward)
 
-        self._airplane['theta'] += action[1]
+        # self._airplane['theta'] += action[1]
 
         if self._airplane['theta'] < 0:
             self._airplane['theta'] += 2*np.pi
