@@ -7,7 +7,7 @@ from gym.utils import seeding
 from .config import Config
 
 
-class SingleAircraft2Env(gym.Env):
+class single_agent(gym.Env):
     """
     action: The change of heading [-1, 1] continuously
             The change of speed [-1, 1] continuously
@@ -42,7 +42,6 @@ class SingleAircraft2Env(gym.Env):
         self.tick = Config.tick
         self.scale = Config.scale
         self.minimum_separation = Config.minimum_separation
-        self.NMAC_dist = Config.NMAC_dist
         self.horizon_dist = Config.horizon_dist
         self.initial_min_dist = Config.initial_min_dist
         self.goal_radius = Config.goal_radius
