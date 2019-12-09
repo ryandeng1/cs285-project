@@ -11,6 +11,8 @@ map_height = 100
 diagonal = map_height * math.sqrt(2)
 num_aircraft = 2 # How many aircrafts showing up in the map (list length)
 n_closest = 4
+rwy_degree = 0
+rwy_degree_sigma = math.radians(45)
 
 scale = 60  # 1 pixel = 30 meters
 min_speed = 80/scale
@@ -39,10 +41,10 @@ class AirTrafficGym(gym.Env):
                                          high=np.array([map_width, map_height]),
                                          dtype=np.float32)
         # discrete action space: -1, 0, 1
-        # self.action_space = spaces.Discrete(3)
+        self.action_space = spaces.Discrete(3)
 
         # continuous action space: [-1, 1]
-        spaces.Box(low=-1, high=1, shape=(2,), dtype=np.float)
+        # spaces.Box(low=-1, high=1, shape=(2,), dtype=np.float)
 
         self.conflicts = 0
         np.random.seed(seed)
@@ -162,7 +164,9 @@ class AirTrafficGym(gym.Env):
                     info[id] = 'w'
 
             # Goal: remove
-            elif (dist_goal < goal_radius) and (self.airport.clock_counter <= self.airport.time_next_aircraft):
+            elif (dist_goal < goal_radius) and (self.airport.clock_counter <= self.airport.time_next_aircraft) \
+            and (((aircraft.heading >= rwy_degree - rwy_degree_sigma) & (aircraft.heading <= rwy_degree + rwy_degree_sigma)) \
+             or((aircraft.heading >= rwy_degree + math.radians(180) - rwy_degree_sigma) & (aircraft.heading <= rwy_degree + math.radians(180)+ rwy_degree_sigma))):
                 aircraft.reward = 1
                 self.goals += 1
                 if aircraft not in aircraft_to_remove:
@@ -291,12 +295,12 @@ class Aircraft:
         self.conflict_id_set = set()
 
     def step(self, a): 
-        self.speed += d_speed * a[1]
+        # self.speed += d_speed * a[1]
         self.speed = max(min_speed, min(self.speed, max_speed))
         self.speed += np.random.normal(0, speed_sigma)
 
-        # self.heading += d_heading * a
-        self.heading += d_heading * a[0]
+        self.heading += d_heading * a
+        # self.heading += d_heading * a[0]
         self.heading += np.random.normal(0, heading_sigma)
 
         vx = self.speed * math.cos(self.heading)
