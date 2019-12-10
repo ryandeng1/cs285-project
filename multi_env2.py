@@ -11,8 +11,8 @@ map_height = 100
 diagonal = map_height * math.sqrt(2)
 num_aircraft = 1 # How many aircrafts showing up in the map (list length)
 n_closest = 0
-rwy_degree = 0
-rwy_degree_sigma = math.radians(45)
+rwy_degree = 90
+rwy_degree_sigma = math.radians(90)
 
 scale = 60  # 1 pixel = 30 meters
 min_speed = 80/scale
@@ -22,7 +22,7 @@ d_speed = 5/scale
 d_heading = math.radians(5)
 heading_sigma = math.radians(0)
 
-goal_radius = 3 # larger will get more goals, small value: agent lands accurately
+goal_radius = .05 # larger will get more goals, small value: agent lands accurately
 time_interval_lower = 60
 time_interval_upper = 120
 conflict_coeff = 0.005
@@ -30,13 +30,16 @@ minimum_separation = 4
 NMAC_dist = 150/scale
 
 
-class AirTrafficGym(gym.Env):
+class AirTrafficGym(gym.GoalEnv):
 
     def __init__(self, seed):
         self.airport = Airport(position = np.array([50., 50.]))
-        self.own_state_size = 8
+        self.own_state_size = 6
         self.int_state_size = 0
-        self.observation_space = (self.own_state_size + n_closest * self.int_state_size,)
+        self.observation_space = spaces.Dict({'observation': spaces.Box(0,1,shape=(4,),dtype=np.float32),
+                                              'desired_goal': spaces.Box(0,1,shape=(3,),dtype=np.float32),
+                                              'achieved_goal': spaces.Box(0,1,shape=(3,),dtype=np.float32)})
+        #spaces.Box(0,1,shape=(6,),dtype=np.float32)
         self.position_range = spaces.Box(low=np.array([0, 0]),
                                          high=np.array([map_width, map_height]),
                                          dtype=np.float32)
@@ -49,6 +52,7 @@ class AirTrafficGym(gym.Env):
         self.conflicts = 0
         np.random.seed(seed)
         self.np_random, seed = seeding.np_random(seed)
+        self.reset()
 
     def reset(self):
         self.aircraft_dict = AC_ActionDict()
@@ -56,22 +60,41 @@ class AirTrafficGym(gym.Env):
         self.conflicts = 0
         self.goals = 0
         self.NMACs = 0
+        aircraft = Aircraft(id = 0,
+                            position = self.random_pos(),
+                            speed = self.random_speed(),
+                            heading = self.random_heading(),
+                            goal_pos = self.airport.position)
+        self.aircraft_dict.add(aircraft)
+        self.airport.generate_interval()
         return self._get_obs()
 
     def _get_obs(self):
         s = []
         id = []
+        result = {}
         for key, aircraft in self.aircraft_dict.ac_dict.items():
             # if self.aircraft_dict.ac_dict.items is empty (after reset()), this for loop will not be implemented
-            own_s = []
-            own_s.append(aircraft.position[0]/ map_width)
-            own_s.append(aircraft.position[1]/ map_height)
-            own_s.append((aircraft.speed - min_speed) / (max_speed - min_speed))
-            own_s.append(aircraft.heading/ (2 * math.pi))
-            own_s.append((0.5 * NMAC_dist)/ diagonal)
-            own_s.append(self.airport.position[0]/ map_width)
-            own_s.append(self.airport.position[1]/ map_height)
-            own_s.append(aircraft.prev_a)
+            obs = []
+            exp_goal = []
+            act_goal = []
+            obs.append(aircraft.position[0]/ map_width)
+            obs.append(aircraft.position[1]/ map_height)
+            obs.append((aircraft.speed - min_speed) / (max_speed - min_speed))
+            obs.append(aircraft.heading/ (2 * math.pi))
+            # own_s.append((0.5 * NMAC_dist)/ diagonal)
+            exp_goal.append(self.airport.position[0]/ map_width)
+            exp_goal.append(self.airport.position[1]/ map_height)
+            exp_goal.append(math.radians(rwy_degree)/(2*math.pi))
+
+            act_goal.append(aircraft.position[0]/ map_width)
+            act_goal.append(aircraft.position[1]/ map_height)
+            if aircraft.heading > math.pi:
+                act_goal.append((aircraft.heading-math.pi)/(2*math.pi))
+            else:
+                act_goal.append(aircraft.heading/(2*math.pi))
+
+            # own_s.append(aircraft.prev_a)
 
             # dist_array, id_array = self.dist_to_all_aircraft(aircraft)
             # closest_ac = np.argsort(dist_array)
@@ -93,14 +116,17 @@ class AirTrafficGym(gym.Env):
                         own_s.append(0)
 
             '''
-            s.append(own_s)
+            result['observation'] = obs
+            result['desired_goal'] = exp_goal
+            result['achieved_goal'] = act_goal
+            return result
             id.append(key)
         return np.reshape(s, (len(s), self.own_state_size+self.int_state_size* n_closest)), id
 
-    def step(self, a, last_ob):
+    def step(self, a):
         for id, aircraft in self.aircraft_dict.ac_dict.items():
             try:
-                aircraft.step(a[id]) # Will not implement when aircraft_dict is empty
+                aircraft.step(a) # Will not implement when aircraft_dict is empty
             except:
                 pass
 
@@ -114,21 +140,30 @@ class AirTrafficGym(gym.Env):
 
             self.airport.generate_interval()
         '''
-        if self.aircraft_dict.num_aircraft < num_aircraft:
-            aircraft = Aircraft(id = self.id_tracker,
-                                position = self.random_pos(),
-                                speed = self.random_speed(),
-                                heading = self.random_heading(),
-                                goal_pos = self.airport.position)
-            self.aircraft_dict.add(aircraft)
-            self.id_tracker += 1
-            self.airport.generate_interval()
 
 
-        reward, terminal, info = self._terminal_reward()
         obs = self._get_obs()
+        # reward, terminal, info = self._terminal_reward()
+        reward = self.compute_reward(obs['achieved_goal'], obs['desired_goal'], None)
+        info = {}
+        info['is_success'] = reward == 1
+        terminal = reward == 1
+        if not terminal:
+            terminal = not (obs['observation'][0] > 0 and obs['observation'][1] > 0 and obs['observation'][0] < 1 and obs['observation'][1] < 1)
+            reward = -1
 
         return obs, reward, terminal, info
+
+    def compute_reward(self, achieved_goal, desired_goal, info):
+        dist_goal = self.dist_2pt(desired_goal[:2], achieved_goal[:2])
+        if (dist_goal < goal_radius) \
+           and ((abs(achieved_goal[2] - desired_goal[2]) < rwy_degree_sigma/(2*math.pi)) \
+                or (abs(achieved_goal[2] - (desired_goal[2]+math.pi)) < rwy_degree_sigma/(2*math.pi))):
+            return 1
+        else:
+            return -.0001
+
+
 
     def _terminal_reward(self):
         reward = {}
@@ -161,7 +196,7 @@ class AirTrafficGym(gym.Env):
                 aircraft.reward = -1
                 aircraft_to_remove.append(aircraft)
                 dones[id] = True
-                info[id] = 'n'
+                info[id] = False
                 self.NMACs += 1
 
             # Out of map: remove
@@ -170,24 +205,27 @@ class AirTrafficGym(gym.Env):
                 if aircraft not in aircraft_to_remove:
                     aircraft_to_remove.append(aircraft)
                     dones[id] = True
-                    info[id] = 'w'
+                    info[id] = False
 
             # Goal: remove
-            elif (dist_goal < goal_radius) and (self.airport.clock_counter <= self.airport.time_next_aircraft) \
-            and (((aircraft.heading >= rwy_degree - rwy_degree_sigma) & (aircraft.heading <= rwy_degree + rwy_degree_sigma)) \
-            or((aircraft.heading >= rwy_degree + math.radians(180) - rwy_degree_sigma) & (aircraft.heading <= rwy_degree + math.radians(180)+ rwy_degree_sigma))):
+            elif (dist_goal < goal_radius) \
+                    and ((abs(aircraft.heading - math.radians(rwy_degree)) < rwy_degree_sigma) \
+                         or (abs(aircraft.heading - math.radians(rwy_degree + 180)) < rwy_degree_sigma)):
+            # and (((aircraft.heading >= rwy_degree - rwy_degree_sigma) & (aircraft.heading <= rwy_degree + rwy_degree_sigma)) \
+            # or((aircraft.heading >= rwy_degree + math.radians(180) - rwy_degree_sigma) & (aircraft.heading <= rwy_degree + math.radians(180)+ rwy_degree_sigma))):
                 aircraft.reward = 1
                 self.goals += 1
                 if aircraft not in aircraft_to_remove:
                     dones[id] = True
                     aircraft_to_remove.append(aircraft)
-                    info[id] = 'g'
-
-            elif aircraft.lifespan == 0:
+                    info[id] = True
+                '''
+                elif aircraft.lifespan == 0:
                 aircraft.reward = -1
                 aircraft_to_remove.append(aircraft)
                 dones[id] = True
-                info[id] = 'f'
+                info[id] = False
+                '''
             # Taking more steps to land has penalty
             elif not conflict:
                 aircraft.reward = -0.001
@@ -195,12 +233,10 @@ class AirTrafficGym(gym.Env):
             reward[id] = aircraft.reward
             if aircraft not in aircraft_to_remove:
                 dones[id] = False
-                info[id] = 't'
+                info[id] = False
 
-        for aircraft in aircraft_to_remove:
-            self.aircraft_dict.remove(aircraft)
 
-        return reward, dones, info
+        return reward[id], dones[id], {'is_success':info[id]}
 
     def dist_to_all_aircraft(self, aircraft):
         id_list = []
@@ -307,7 +343,7 @@ class Aircraft:
         self.heading = math.atan2(dy, dx)
 
         self.conflict_id_set = set()
-        self.lifespan = 1000
+        self.lifespan = 10000000
 
     def step(self, a):
         # self.speed += d_speed * a[1]
@@ -317,6 +353,10 @@ class Aircraft:
         self.heading += d_heading * a
         # self.heading += d_heading * a[0]
         self.heading += np.random.normal(0, heading_sigma)
+        if self.heading > 2*np.pi:
+            self.heading -= 2*np.pi
+        elif self.heading < 0:
+            self.heading += 2*np.pi
 
         vx = self.speed * math.cos(self.heading)
         vy = self.speed * math.sin(self.heading)
