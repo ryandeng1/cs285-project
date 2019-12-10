@@ -8,7 +8,6 @@ from collections import deque
 from ac_agent import Agent
 import sys
 sys.path.extend(['../Simulators'])
-from config import Config
 from multi_env import AirTrafficGym
 np.set_printoptions(precision=2)
 config = tf.ConfigProto()
@@ -25,7 +24,7 @@ def train(env, agent, save_path):
     rolling_goals = deque(maxlen=500)
     best_score = -1000
 
-    for e in range(Config.no_episodes):
+    for e in range(100000): # number of episodes
 
         episode = False
         last_ob,old_id = env.reset()
