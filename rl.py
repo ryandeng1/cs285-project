@@ -13,10 +13,9 @@ import gym
 
 # dataset = ExpertDataset(expert_path='expert_airtraffic.npz', traj_limitation=1, batch_size=128)
 
-env =  HERGoalEnvWrapper(AirTrafficGym(101))#DummyVecEnv([lambda : AirTrafficGym(101)])
-model_class = DQN
+env = AirTrafficGym(101)#DummyVecEnv([lambda : AirTrafficGym(101)])
 goal_selection_strategy = 'future'
-model = HER('MlpPolicy', env, model_class, policy_kwargs=dict(layers=[512,512]), verbose=1)
+model = DQN('MlpPolicy', env, verbose=1,prioritized_replay=True)
 # model.pretrain(dataset, n_epochs=100000)
 # print('pretrain done')
 model.learn(total_timesteps=100000)
