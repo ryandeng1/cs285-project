@@ -6,7 +6,6 @@ from stable_baselines import PPO2, A2C
 
 
 import gym
-#import traf_env
 import multi_env_rllib
 import ray
 from ray import tune
@@ -18,7 +17,7 @@ from ray.rllib.agents.ppo.ppo_policy import PPOTFPolicy
 from ray.rllib.agents.dqn.dqn import DQNTrainer
 from ray.rllib.agents.dqn.dqn_policy import DQNTFPolicy
 from ray.tune.logger import pretty_print
-
+from multi_env2 import AirTrafficGym
 
 ray.init()
 def policy_mapping_fn(agent_id):
@@ -28,10 +27,10 @@ def policy_mapping_fn(agent_id):
 env = multi_env_rllib.AirTrafficGym(seed=0, num_agents=1)
 register_env("multi_air-v0", lambda c: env)
 
-num_train_itr = 50
+num_train_itr = 500
 policies = {"dqn_policy": (DQNTFPolicy, env.observation_space, env.action_space, {})}
-"""
-dqn_trainer = DQNTrainer(
+
+trainer = DQNTrainer(
         env="multi_air-v0",
         config={
             "multiagent": {
@@ -39,13 +38,15 @@ dqn_trainer = DQNTrainer(
                 "policy_mapping_fn": policy_mapping_fn,
                 "policies_to_train": ["dqn_policy"],
             },
-            "gamma": 0.95,
+            "gamma": 0.99,
             "n_step": 3,
         })
-"""
-dqn_trainer = DQNTrainer(env="multi_air-v0")
 
+#trainer = DQNTrainer(env="multi_air-v0")
+#trainer = PPOTrainer(env="multi_air-v0")
 for i in range(num_train_itr):
-  print("****************************Iteration: ", i, "****************************")
-  print(pretty_print(dqn_trainer.train()))
+    x = trainer.train()
+    if i % 10 == 0:
+        print("****************************Iteration: ", i, "****************************")
+        print(pretty_print(x))
 

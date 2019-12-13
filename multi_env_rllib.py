@@ -33,7 +33,7 @@ NMAC_dist = 150/scale
 
 class AirTrafficGym(MultiAgentEnv):
 
-    def __init__(self, seed, num_agents=2):
+    def __init__(self, seed, num_agents):
         self.airport = Airport(position = np.array([50., 50.]))
         self.own_state_size = 8
         self.int_state_size = 0
@@ -43,14 +43,13 @@ class AirTrafficGym(MultiAgentEnv):
                                          dtype=np.float32)
         # discrete action space: -1, 0, 1
         self.action_space = spaces.Discrete(3)
-
         # continuous action space: [-1, 1]
         # spaces.Box(low=-1, high=1, shape=(2,), dtype=np.float)
-
         self.conflicts = 0
         np.random.seed(seed)
         self.np_random, seed = seeding.np_random(seed)
         self.num_agents = num_agents
+        self.boundary_epsilon = 0.0001
         self.reset()
 
     def reset(self):
@@ -71,14 +70,16 @@ class AirTrafficGym(MultiAgentEnv):
             self.aircraft_dict.add(aircraft)
 
         self.airport.generate_interval()
-        return self._get_obs()
+        return self._get_obs([str(i) for i in range(self.num_agents)])
 
-    def _get_obs(self):
+    def _get_obs(self, lst_airplanes):
         state = {}
         ids = []
         #s = []
         #id = []
-        for aircraft_id, aircraft in self.aircraft_dict.ac_dict.items():
+        #for aircraft_id, aircraft in self.aircraft_dict.ac_dict.items():
+        for aircraft_id in lst_airplanes:
+            aircraft = self.aircraft_dict.ac_dict[aircraft_id]
             # if self.aircraft_dict.ac_dict.items is empty (after reset()), this for loop will not be implemented
             own_s = []
             own_s.append(aircraft.position[0]/ map_width)
@@ -90,10 +91,8 @@ class AirTrafficGym(MultiAgentEnv):
             #own_s.append(self.airport.position[1]/ map_height)
             own_s.append(math.radians(rwy_degree)/(2*math.pi))
             own_s.append(aircraft.lifespan/aircraft.total_lifespan)
-
-            state[aircraft_id] = list(own_s)
+            state[aircraft_id] = own_s
             # own_s.append(aircraft.prev_a)
-
             # dist_array, id_array = self.dist_to_all_aircraft(aircraft)
             # closest_ac = np.argsort(dist_array)
             '''
@@ -114,15 +113,15 @@ class AirTrafficGym(MultiAgentEnv):
                         own_s.append(0)
 
             '''
-            #return np.array(own_s)
-            #id.append(key)
-        #return np.reshape(s, (len(s), self.own_state_size+self.int_state_size* n_closest)), id
+            
         return state
 
     def step(self, a):
-        #print("Step: ", self.aircraft_dict.ac_dict.keys())
-        for aircraft_id, aircraft in self.aircraft_dict.ac_dict.items():
-            aircraft.step(a[aircraft_id]) # Will not implement when aircraft_dict is empty
+        # Only step for planes with a provided action given by a.
+        lst_airplanes = []
+        for action_id in a.keys():
+            self.aircraft_dict.ac_dict[action_id].step(a[action_id])
+            lst_airplanes.append(action_id)
             
 
         self.airport.step()
@@ -135,11 +134,8 @@ class AirTrafficGym(MultiAgentEnv):
 
             self.airport.generate_interval()
         '''
-
-
-        obs = self._get_obs()
-        reward, done, info = self._terminal_reward()
-
+        obs = self._get_obs(lst_airplanes)
+        reward, done, info = self._terminal_reward(lst_airplanes)
         if False in done.values():
             done["__all__"] = False
         else:
@@ -147,21 +143,23 @@ class AirTrafficGym(MultiAgentEnv):
 
         return obs, reward, done, info
 
-    def _terminal_reward(self):
+    def _terminal_reward(self, lst_airplanes):
         reward = {}
         dones = {}
         info = {}
         info_dist_list = []
-        aircraft_to_remove = []
-        for aircraft_id, aircraft in self.aircraft_dict.ac_dict.items():
+        #aircraft_to_remove = []
+        #for aircraft_id, aircraft in self.aircraft_dict.ac_dict.items():
+        for aircraft_id in lst_airplanes:
+            aircraft = self.aircraft_dict.ac_dict[aircraft_id]
             dist_array, id_array = self.dist_to_all_aircraft(aircraft)
             min_dist = min(dist_array) if dist_array.shape[0] > 0 else 9999
             dist_goal = self.dist_2pt(aircraft.position, self.airport.position)
             aircraft.reward = 0
             conflict = False
-            aircraft.lifespan -= 1
-
+            #aircraft.lifespan = max(aircraft.lifespan - 1, 0)
             # Conflict: aircraft will NOT be removed
+            """
             for id_, dist in zip(id_array, dist_array):
                 if dist >= minimum_separation:
                     aircraft.conflict_id_set.discard(id_)
@@ -173,21 +171,34 @@ class AirTrafficGym(MultiAgentEnv):
                     if dist == min_dist:
                         aircraft.reward = -0.1 + conflict_coeff * dist
 
+            """
 
 
-
+            """
             if not self.position_range.contains(np.array(aircraft.position)):
-                #print("Out of bounds")
                 aircraft.reward = -1
-                if aircraft not in aircraft_to_remove:
-                    aircraft_to_remove.append(aircraft)
-                    dones[aircraft_id] = True
-                    info[aircraft_id] = False
-            #print("Aircraft position: ", aircraft.position)
+                #if aircraft not in aircraft_to_remove:
+                    #aircraft_to_remove.append(aircraft)
+                dones[aircraft_id] = True
+                info[aircraft_id] = False
+            """
+            if self.check_near_boundary(aircraft.position[0], aircraft.position[1]):
+                aircraft.reward = -1
+                #if aircraft not in aircraft_to_remove:
+                    #aircraft_to_remove.append(aircraft)
+                dones[aircraft_id] = True
+                info[aircraft_id] = False
+            # Check near boundary
+            elif aircraft.lifespan == 0:
+                aircraft.reward = -1
+                #if aircraft not in aircraft_to_remove:
+                    #aircraft_to_remove.append(aircraft)
+                dones[aircraft_id] = True
+                info[aircraft_id] = False
             # NMAC: remove
             elif min_dist < NMAC_dist:
                 aircraft.reward = -1
-                aircraft_to_remove.append(aircraft)
+                #aircraft_to_remove.append(aircraft)
                 dones[aircraft_id] = True
                 info[aircraft_id] = False
                 self.NMACs += 1
@@ -201,10 +212,10 @@ class AirTrafficGym(MultiAgentEnv):
             # or((aircraft.heading >= rwy_degree + math.radians(180) - rwy_degree_sigma) & (aircraft.heading <= rwy_degree + math.radians(180)+ rwy_degree_sigma))):
                 aircraft.reward = 1 # aircraft.lifespan/aircraft.total_lifespan
                 self.goals += 1
-                if aircraft not in aircraft_to_remove:
-                    dones[aircraft_id] = True
-                    aircraft_to_remove.append(aircraft)
-                    info[aircraft_id] = True
+                #if aircraft not in aircraft_to_remove:
+                dones[aircraft_id] = True
+                #aircraft_to_remove.append(aircraft)
+                info[aircraft_id] = True
                 '''
                 elif aircraft.lifespan == 0:
                 aircraft.reward = -1
@@ -217,10 +228,10 @@ class AirTrafficGym(MultiAgentEnv):
                 aircraft.reward = -0.001
 
             reward[aircraft_id] = aircraft.reward
-            if aircraft not in aircraft_to_remove:
+            #if aircraft not in aircraft_to_remove:
+            if aircraft_id not in dones:
                 dones[aircraft_id] = False
                 info[aircraft_id] = False
-
 
         #return reward[id], dones[id], {'is_success':info[id]}
         return reward, dones, self.process_info(info)
@@ -270,6 +281,25 @@ class AirTrafficGym(MultiAgentEnv):
         })
 
         return spaces.Tuple((s,) * num_aircraft)
+        """
+        return spaces.Tuple((spaces.Box(low=-map_width, high=map_width), 
+                             spaces.Box(low=-map_height, high=map_height),
+                             spaces.Box(low=min_speed, max=max_speed),
+                             spaces.Box(low=0, high=2 * np.pi),
+                             spaces.Box()))
+        """
+
+
+
+    def check_near_boundary(self, pos_x, pos_y):
+        if abs(pos_x - 0) < self.boundary_epsilon or abs(pos_y - 0) < self.boundary_epsilon:
+            return True
+
+        if abs(pos_x - map_width) < self.boundary_epsilon or abs(pos_y - map_height) < self.boundary_epsilon:
+            return True
+
+        return False
+
 
 class AC_ActionDict:
     def __init__(self):
@@ -366,7 +396,21 @@ class Aircraft:
         vy = self.speed * math.sin(self.heading)
         self.velocity = np.array([vx, vy])
         self.position += self.velocity
+
+        # Bound the position
+        if self.position[0] < 0:
+            self.position[0] = 0
+
+        if self.position[0] >= map_width:
+            self.position[0] = map_width
+
+        if self.position[1] < 0:
+            self.position[1] = 0
+
+        if self.position[1] >= map_height:
+            self.position[1] = map_height
         self.prev_a = a
+
 
 class Airport:
     def __init__(self, position):
