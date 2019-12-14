@@ -36,12 +36,14 @@ class AirTrafficGym(gym.GoalEnv):
         self.airport = Airport(position = np.array([50., 50.]))
         self.own_state_size = 8
         self.int_state_size = 0
-        self.observation_space = spaces.Box(0,1,shape=(8,),dtype=np.float32)
+        # self.observation_space = spaces.Box(0,1,shape=(8,),dtype=np.float32)
+        self.observation_space = self.build_observation_space()
         self.position_range = spaces.Box(low=np.array([0, 0]),
                                          high=np.array([map_width, map_height]),
                                          dtype=np.float32)
         # discrete action space: -1, 0, 1
-        self.action_space = spaces.Discrete(3)
+        # self.action_space = spaces.Discrete(3)
+        self.action_space = spaces.Tuple((spaces.Discrete(3), ) * num_aircraft)
 
         # continuous action space: [-1, 1]
         # spaces.Box(low=-1, high=1, shape=(2,), dtype=np.float)
@@ -99,11 +101,9 @@ class AirTrafficGym(gym.GoalEnv):
                     own_s.append((0.5 * NMAC_dist)/ diagonal)
                     own_s.append(NMAC_dist/ diagonal)
                     own_s.append(aircraft.prev_a)
-
                 except:
                     for k in range(self.int_state_size):
                         own_s.append(0)
-
             '''
             return np.array(own_s)
             id.append(key)
@@ -123,7 +123,6 @@ class AirTrafficGym(gym.GoalEnv):
         if min_dist > 3 * minimum_separation and self.aircraft_dict.num_aircraft < num_aircraft:
             self.aircraft_dict.add(aircraft)
             self.id_tracker += 1
-
             self.airport.generate_interval()
         '''
 
