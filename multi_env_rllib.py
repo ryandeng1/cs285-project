@@ -210,7 +210,7 @@ class AirTrafficGym(MultiAgentEnv):
                          or (abs(aircraft.heading - math.radians(rwy_degree + 180)) < rwy_degree_sigma)):
             # and (((aircraft.heading >= rwy_degree - rwy_degree_sigma) & (aircraft.heading <= rwy_degree + rwy_degree_sigma)) \
             # or((aircraft.heading >= rwy_degree + math.radians(180) - rwy_degree_sigma) & (aircraft.heading <= rwy_degree + math.radians(180)+ rwy_degree_sigma))):
-                aircraft.reward = 100 # aircraft.lifespan/aircraft.total_lifespan
+                aircraft.reward = 1 # aircraft.lifespan/aircraft.total_lifespan
                 self.goals += 1
                 #if aircraft not in aircraft_to_remove:
                 dones[aircraft_id] = True
