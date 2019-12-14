@@ -37,7 +37,7 @@ class AirTrafficGym(MultiAgentEnv):
         self.airport = Airport(position = np.array([50., 50.]))
         self.own_state_size = 8
         self.int_state_size = 0
-        self.observation_space = spaces.Box(low=0,high=1,shape=(6,),dtype=np.float32)
+        self.observation_space = self.build_observation_space() #spaces.Box(low=0,high=1,shape=(6,),dtype=np.float32)
         self.position_range = spaces.Box(low=np.array([0, 0]),
                                          high=np.array([map_width, map_height]),
                                          dtype=np.float32)
@@ -82,6 +82,7 @@ class AirTrafficGym(MultiAgentEnv):
             aircraft = self.aircraft_dict.ac_dict[aircraft_id]
             # if self.aircraft_dict.ac_dict.items is empty (after reset()), this for loop will not be implemented
             own_s = []
+            """
             own_s.append(aircraft.position[0]/ map_width)
             own_s.append(aircraft.position[1]/ map_height)
             own_s.append((aircraft.speed - min_speed) / (max_speed - min_speed))
@@ -91,6 +92,11 @@ class AirTrafficGym(MultiAgentEnv):
             #own_s.append(self.airport.position[1]/ map_height)
             own_s.append(math.radians(rwy_degree)/(2*math.pi))
             own_s.append(aircraft.lifespan/aircraft.total_lifespan)
+            """
+            own_s.append(aircraft.position[0])
+            own_s.append(aircraft.position[1])
+            own_s.append(aircraft.speed)
+            own_s.append(aircraft.heading)
             state[aircraft_id] = own_s
             # own_s.append(aircraft.prev_a)
             # dist_array, id_array = self.dist_to_all_aircraft(aircraft)
@@ -183,21 +189,21 @@ class AirTrafficGym(MultiAgentEnv):
                 info[aircraft_id] = False
             """
             if self.check_near_boundary(aircraft.position[0], aircraft.position[1]):
-                aircraft.reward = -1
+                aircraft.reward = -100
                 #if aircraft not in aircraft_to_remove:
                     #aircraft_to_remove.append(aircraft)
                 dones[aircraft_id] = True
                 info[aircraft_id] = False
             # Check near boundary
             elif aircraft.lifespan == 0:
-                aircraft.reward = -1
+                aircraft.reward = -100
                 #if aircraft not in aircraft_to_remove:
                     #aircraft_to_remove.append(aircraft)
                 dones[aircraft_id] = True
                 info[aircraft_id] = False
             # NMAC: remove
             elif min_dist < NMAC_dist:
-                aircraft.reward = -1
+                aircraft.reward = -100
                 #aircraft_to_remove.append(aircraft)
                 dones[aircraft_id] = True
                 info[aircraft_id] = False
@@ -210,7 +216,7 @@ class AirTrafficGym(MultiAgentEnv):
                          or (abs(aircraft.heading - math.radians(rwy_degree + 180)) < rwy_degree_sigma)):
             # and (((aircraft.heading >= rwy_degree - rwy_degree_sigma) & (aircraft.heading <= rwy_degree + rwy_degree_sigma)) \
             # or((aircraft.heading >= rwy_degree + math.radians(180) - rwy_degree_sigma) & (aircraft.heading <= rwy_degree + math.radians(180)+ rwy_degree_sigma))):
-                aircraft.reward = 1 # aircraft.lifespan/aircraft.total_lifespan
+                aircraft.reward = 100 # aircraft.lifespan/aircraft.total_lifespan
                 self.goals += 1
                 #if aircraft not in aircraft_to_remove:
                 dones[aircraft_id] = True
@@ -225,7 +231,7 @@ class AirTrafficGym(MultiAgentEnv):
                 '''
             # Taking more steps to land has penalty
             elif not conflict:
-                aircraft.reward = -0.001
+                aircraft.reward -= 0.1 #-0.001
 
             reward[aircraft_id] = aircraft.reward
             #if aircraft not in aircraft_to_remove:
@@ -260,15 +266,16 @@ class AirTrafficGym(MultiAgentEnv):
         return math.sqrt(dx ** 2 + dy ** 2)
 
     def random_pos(self):
-        return np.random.uniform(low=np.array([0, 0]), high=np.array([map_width, map_height]))
+        return np.array([10, 10]) #np.random.uniform(low=np.array([0, 0]), high=np.array([map_width, map_height]))
 
     def random_speed(self):
-        return np.random.uniform(low = min_speed, high = max_speed)
+        return min_speed + 0.1 #np.random.uniform(low = min_speed, high = max_speed)
 
     def random_heading(self):
-        return np.random.uniform(low=0, high=2 * math.pi)
+        return 0 #np.random.uniform(low=0, high=2 * math.pi)
 
     def build_observation_space(self):
+        """
         s = spaces.Dict({
             'pos_x': spaces.Box(low=0, high = map_width, shape=(1,), dtype=np.float32),
             'pos_y': spaces.Box(low=0, high = map_height, shape=(1,), dtype=np.float32),
@@ -282,12 +289,10 @@ class AirTrafficGym(MultiAgentEnv):
 
         return spaces.Tuple((s,) * num_aircraft)
         """
-        return spaces.Tuple((spaces.Box(low=-map_width, high=map_width), 
-                             spaces.Box(low=-map_height, high=map_height),
-                             spaces.Box(low=min_speed, max=max_speed),
-                             spaces.Box(low=0, high=2 * np.pi),
-                             spaces.Box()))
-        """
+
+        # x, y, speed and heading
+        return spaces.Box(low=np.array([0, 0, min_speed, 0]), high=np.array([map_width, map_height, max_speed, 2 * np.pi]))
+                            
 
 
 
