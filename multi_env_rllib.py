@@ -13,7 +13,7 @@ diagonal = map_height * math.sqrt(2)
 num_aircraft = 1 # How many aircrafts showing up in the map (list length)
 n_closest = 0
 rwy_degree = 90
-rwy_degree_sigma = math.radians(30)
+rwy_degree_sigma = math.radians(90) #math.radians(30)
 
 scale = 60  # 1 pixel = 30 meters
 min_speed = 80/scale
@@ -64,9 +64,7 @@ class AirTrafficGym(MultiAgentEnv):
                                 speed = self.random_speed(),
                                 heading = self.random_heading(),
                                 goal_pos = self.airport.position)
-            
-            #print("RANDOM HEADING", aircraft.heading)
-            #print("Actually random", self.random_heading())
+
             self.aircraft_dict.add(aircraft)
 
         self.airport.generate_interval()
@@ -75,28 +73,16 @@ class AirTrafficGym(MultiAgentEnv):
     def _get_obs(self, lst_airplanes):
         state = {}
         ids = []
-        #s = []
-        #id = []
         #for aircraft_id, aircraft in self.aircraft_dict.ac_dict.items():
         for aircraft_id in lst_airplanes:
             aircraft = self.aircraft_dict.ac_dict[aircraft_id]
             # if self.aircraft_dict.ac_dict.items is empty (after reset()), this for loop will not be implemented
             own_s = []
-            """
+            
             own_s.append(aircraft.position[0]/ map_width)
             own_s.append(aircraft.position[1]/ map_height)
             own_s.append((aircraft.speed - min_speed) / (max_speed - min_speed))
             own_s.append(aircraft.heading/ (2 * math.pi))
-            # own_s.append((0.5 * NMAC_dist)/ diagonal)
-            #own_s.append(self.airport.position[0]/ map_width)
-            #own_s.append(self.airport.position[1]/ map_height)
-            own_s.append(math.radians(rwy_degree)/(2*math.pi))
-            own_s.append(aircraft.lifespan/aircraft.total_lifespan)
-            """
-            own_s.append(aircraft.position[0])
-            own_s.append(aircraft.position[1])
-            own_s.append(aircraft.speed)
-            own_s.append(aircraft.heading)
             state[aircraft_id] = own_s
             # own_s.append(aircraft.prev_a)
             # dist_array, id_array = self.dist_to_all_aircraft(aircraft)
@@ -239,7 +225,6 @@ class AirTrafficGym(MultiAgentEnv):
                 dones[aircraft_id] = False
                 info[aircraft_id] = False
 
-        #return reward[id], dones[id], {'is_success':info[id]}
         return reward, dones, self.process_info(info)
 
 
@@ -266,7 +251,7 @@ class AirTrafficGym(MultiAgentEnv):
         return math.sqrt(dx ** 2 + dy ** 2)
 
     def random_pos(self):
-        return np.array([10, 10]) #np.random.uniform(low=np.array([0, 0]), high=np.array([map_width, map_height]))
+        return np.random.uniform(low=np.array([0, 0]), high=np.array([map_width, map_height]))
 
     def random_speed(self):
         return min_speed + 0.1 #np.random.uniform(low = min_speed, high = max_speed)
@@ -275,26 +260,10 @@ class AirTrafficGym(MultiAgentEnv):
         return 0 #np.random.uniform(low=0, high=2 * math.pi)
 
     def build_observation_space(self):
-        """
-        s = spaces.Dict({
-            'pos_x': spaces.Box(low=0, high = map_width, shape=(1,), dtype=np.float32),
-            'pos_y': spaces.Box(low=0, high = map_height, shape=(1,), dtype=np.float32),
-            'vel_x': spaces.Box(low = -max_speed, high = max_speed, shape=(1,), dtype=np.float32),
-            'vel_y': spaces.Box(low = -max_speed, high = max_speed, shape=(1,), dtype=np.float32),
-            'speed': spaces.Box(low = min_speed, high = max_speed, shape=(1,), dtype=np.float32),
-            'heading': spaces.Box(low=0, high=2 * math.pi, shape=(1,), dtype=np.float32),
-            'goal_x': spaces.Box(low=0, high = map_width, shape=(1,), dtype=np.float32),
-            'goal_y': spaces.Box(low=0, high = map_height, shape=(1,), dtype=np.float32),
-        })
-
-        return spaces.Tuple((s,) * num_aircraft)
-        """
-
-        # x, y, speed and heading
-        return spaces.Box(low=np.array([0, 0, min_speed, 0]), high=np.array([map_width, map_height, max_speed, 2 * np.pi]))
+        # x, y, speed and heading, normalized.
+        #return spaces.Box(low=np.array([0, 0, min_speed, 0]), high=np.array([map_width, map_height, max_speed, 2 * np.pi]))
+        return spaces.Box(low=0, high=1, shape=(4,), dtype=np.float32)
                             
-
-
 
     def check_near_boundary(self, pos_x, pos_y):
         if abs(pos_x - 0) < self.boundary_epsilon or abs(pos_y - 0) < self.boundary_epsilon:
