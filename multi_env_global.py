@@ -1,11 +1,13 @@
 import math
 import numpy as np
 import random
+from random import randrange
 import gym
 from gym import spaces
 from gym.utils import seeding
 from collections import OrderedDict
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
+
 
 map_width = 100
 map_height = 100
@@ -59,10 +61,11 @@ class AirTrafficGym(MultiAgentEnv):
         self.goals = 0
         self.NMACs = 0
         for i in range(self.num_agents):
+            random_position = self.random_pos()
             aircraft = Aircraft(id = str(i),
-                                position = self.random_pos(),
+                                position = random_position,
                                 speed = self.random_speed(),
-                                heading = self.random_heading(),
+                                heading = self.random_heading(random_position),
                                 goal_pos = self.airport.position)
             
             #print("RANDOM HEADING", aircraft.heading)
@@ -266,13 +269,26 @@ class AirTrafficGym(MultiAgentEnv):
         return math.sqrt(dx ** 2 + dy ** 2)
 
     def random_pos(self):
-        return np.array([10, 10]) #np.random.uniform(low=np.array([0, 0]), high=np.array([map_width, map_height]))
+        theta = np.linspace(0, 2 * np.pi, 1000)
+        a, b = radius * np.cos(theta) + self.airport.position[0], radius * np.sin(theta) + self.airport.position[1]
+        idx = randrange(1000)
+        pos = np.array([a[idx], b[idx]])
+        return pos
+        # return np.array([10, 10]) #np.random.uniform(low=np.array([0, 0]), high=np.array([map_width, map_height]))
 
     def random_speed(self):
         return min_speed + 0.1 #np.random.uniform(low = min_speed, high = max_speed)
 
-    def random_heading(self):
-        return 0 #np.random.uniform(low=0, high=2 * math.pi)
+    def random_heading(self, random_position):
+        if (random_position[0] >= 50) & (random_position[1] >= 50):
+            rdn_heading = np.random.uniform(low=0, high=0.5 * math.pi)
+        elif (random_position[0] < 50) & (random_position[1] >= 50):
+            rdn_heading = np.random.uniform(low=0.5 * math.pi, high=math.pi)
+        elif (random_position[0] < 50) & (random_position[1] < 50):
+            rdn_heading = np.random.uniform(low = math.pi, high = 1.5 * math.pi)
+        else:
+            rdn_heading = np.random.uniform(low = 1.5 * math.pi, high = 2 * math.pi)
+        return rdn_heading #np.random.uniform(low=0, high=2 * math.pi)
 
     def build_observation_space(self):
         """
