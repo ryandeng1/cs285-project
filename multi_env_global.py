@@ -32,6 +32,8 @@ conflict_coeff = 0.005
 minimum_separation = 4
 NMAC_dist = 150/scale
 
+radius = 40
+
 
 class AirTrafficGym(MultiAgentEnv):
 
@@ -280,14 +282,7 @@ class AirTrafficGym(MultiAgentEnv):
         return min_speed + 0.1 #np.random.uniform(low = min_speed, high = max_speed)
 
     def random_heading(self, random_position):
-        if (random_position[0] >= 50) & (random_position[1] >= 50):
-            rdn_heading = np.random.uniform(low=0, high=0.5 * math.pi)
-        elif (random_position[0] < 50) & (random_position[1] >= 50):
-            rdn_heading = np.random.uniform(low=0.5 * math.pi, high=math.pi)
-        elif (random_position[0] < 50) & (random_position[1] < 50):
-            rdn_heading = np.random.uniform(low = math.pi, high = 1.5 * math.pi)
-        else:
-            rdn_heading = np.random.uniform(low = 1.5 * math.pi, high = 2 * math.pi)
+        rdn_heading = math.atan2(random_position[1] - self.airport.position, random_position[0] - self.airport.position) + math.pi
         return rdn_heading #np.random.uniform(low=0, high=2 * math.pi)
 
     def build_observation_space(self):
