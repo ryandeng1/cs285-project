@@ -282,7 +282,7 @@ class AirTrafficGym(MultiAgentEnv):
         return min_speed + 0.1 #np.random.uniform(low = min_speed, high = max_speed)
 
     def random_heading(self, random_position):
-        rdn_heading = math.atan2(random_position[1] - self.airport.position, random_position[0] - self.airport.position) + math.pi
+        rdn_heading = math.atan2(random_position[1] - self.airport.position[1], random_position[0] - self.airport.position[0]) + math.pi
         return rdn_heading #np.random.uniform(low=0, high=2 * math.pi)
 
     def build_observation_space(self):
