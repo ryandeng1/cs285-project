@@ -7,12 +7,15 @@ from gym import spaces
 from gym.utils import seeding
 from collections import OrderedDict
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
+from gym.envs.classic_control import rendering
+from colour import Color
+import os
 
 
 map_width = 100
 map_height = 100
 diagonal = map_height * math.sqrt(2)
-num_aircraft = 1 # How many aircrafts showing up in the map (list length)
+num_aircraft = 3 # How many aircrafts showing up in the map (list length)
 n_closest = 0
 rwy_degree = 90
 rwy_degree_sigma = math.radians(90)
@@ -38,6 +41,7 @@ radius = 40
 class AirTrafficGym(MultiAgentEnv):
 
     def __init__(self, seed, num_agents):
+        self.viewer = None
         self.airport = Airport(position = np.array([50., 50.]))
         self.own_state_size = 8
         self.int_state_size = 0
@@ -247,6 +251,25 @@ class AirTrafficGym(MultiAgentEnv):
         #return reward[id], dones[id], {'is_success':info[id]}
         return reward, dones, self.process_info(info)
 
+    def render(self):
+        red = Color('red')
+        colors = list(red.range_to(Color('green'), num_aircraft))
+        if self.viewer is None:
+            self.viewer = rendering.Viewer(map_width, map_height)
+            self.viewer.set_bounds(0, map_width, 0, map_height)
+        for id, aircraft in self.aircraft_dict.ac_dict.items():
+            aircraft_img = rendering.Image(os.getcwd() + '/images/aircraft.png', 32, 32)
+            heading_img = rendering.Transform(rotation=aircraft.heading - math.pi / 2, translation=aircraft.position)
+            aircraft_img.add_attr(heading_img)
+            r, g, b = colors[int(aircraft.id) % num_aircraft].get_rgb()
+            aircraft_img.set_color(r, g, b)
+            self.viewer.onetime_geoms.append(aircraft_img)
+        return self.viewer.render(return_rgb_array = False)
+
+    def close(self):
+        if self.viewer:
+            self.viewer.close()
+            self.viewer = None
 
     # Change info dict to something compatible with rllib
     def process_info(self, info):
