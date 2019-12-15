@@ -13,7 +13,7 @@ diagonal = map_height * math.sqrt(2)
 num_aircraft = 1 # How many aircrafts showing up in the map (list length)
 n_closest = 0
 rwy_degree = 90
-rwy_degree_sigma = math.radians(30)
+rwy_degree_sigma = math.radians(90)
 
 scale = 60  # 1 pixel = 30 meters
 min_speed = 80/scale
