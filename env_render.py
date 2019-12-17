@@ -49,7 +49,7 @@ class AirTrafficGym(MultiAgentEnv):
                                          high=np.array([map_width, map_height]),
                                          dtype=np.float32)
         # discrete action space: -1, 0, 1
-        self.action_space = spaces.Tuple((spaces.Discrete(3), ) * self.num_agents)
+        self.action_space = spaces.Tuple((spaces.Discrete(3), spaces.Discrete(3)))
         # self.action_space = spaces.Tuple((spaces.Box(low=-1, high=1, shape=(2,), dtype=np.float), ) * self.num_agents)
         # continuous action space: [-1, 1]
         # spaces.Box(low=-1, high=1, shape=(2,), dtype=np.float)
@@ -120,7 +120,8 @@ class AirTrafficGym(MultiAgentEnv):
         # Only step for planes with a provided action given by a.
         lst_airplanes = []
         for action_id in a.keys():
-            # print('aircraft_dict.ac_dict:', self.aircraft_dict.ac_dict[action_id])
+            print('a', a)
+            print(a[action_id])
             self.aircraft_dict.ac_dict[action_id].step(a[action_id])
             lst_airplanes.append(action_id)
         self.airport.step()
