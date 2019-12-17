@@ -10,7 +10,7 @@ from ray.rllib.env.multi_agent_env import MultiAgentEnv
 from gym.envs.classic_control import rendering 
 from colour import Color
 import os
-import time
+# import time
 
 map_width = 100
 map_height = 100
@@ -20,7 +20,7 @@ n_closest = 0
 rwy_degree = 90
 rwy_degree_sigma = math.radians(90) #math.radians(30)
 
-scale = 60  # 1 pixel = 30 meters
+scale = 30  # 1 pixel = 30 meters
 min_speed = 80/scale
 max_speed = 350/scale
 speed_sigma = 0/scale
@@ -49,7 +49,7 @@ class AirTrafficGym(MultiAgentEnv):
                                          high=np.array([map_width, map_height]),
                                          dtype=np.float32)
         # discrete action space: -1, 0, 1
-        self.action_space = spaces.Discrete(3)
+        self.action_space = spaces.Tuple((spaces.Discrete(3), ) * self.num_agents)
         # self.action_space = spaces.Tuple((spaces.Box(low=-1, high=1, shape=(2,), dtype=np.float), ) * self.num_agents)
         # continuous action space: [-1, 1]
         # spaces.Box(low=-1, high=1, shape=(2,), dtype=np.float)
@@ -123,8 +123,6 @@ class AirTrafficGym(MultiAgentEnv):
             # print('aircraft_dict.ac_dict:', self.aircraft_dict.ac_dict[action_id])
             self.aircraft_dict.ac_dict[action_id].step(a[action_id])
             lst_airplanes.append(action_id)
-            
-
         self.airport.step()
         '''
         dist_array, id_array = self.dist_to_all_aircraft(aircraft) # will return empty list when aircraft_dict is empty
@@ -138,12 +136,11 @@ class AirTrafficGym(MultiAgentEnv):
         obs = self._get_obs(lst_airplanes)
         reward, done, info = self._terminal_reward(lst_airplanes)
         self.render()
-        time.sleep(1e-5)
+        # time.sleep(1)
         if False in done.values():
             done["__all__"] = False
         else:
             done["__all__"] = True
-
         return obs, reward, done, info
 
     def _terminal_reward(self, lst_airplanes):
@@ -245,6 +242,7 @@ class AirTrafficGym(MultiAgentEnv):
         heading_img = rendering.Transform(rotation = math.radians(rwy_degree) - math.pi / 2, 
                                           translation = self.airport.position)
         goal_img.add_attr(heading_img)
+        r, g, b = Color('white').get_rgb()
         goal_img.set_color(r, g, b)
         self.viewer.onetime_geoms.append(goal_img)
 
@@ -398,12 +396,13 @@ class Aircraft:
         self.total_lifespan = self.lifespan
 
     def step(self, a):
-        # self.speed += d_speed * a[1]
+        print(a)
+        self.speed += d_speed * (a[1] - 1)
         self.speed = max(min_speed, min(self.speed, max_speed))
         self.speed += np.random.normal(0, speed_sigma)
 
-        self.heading += d_heading * (a-1)
-        # self.heading += d_heading * a[0]
+        # self.heading += d_heading * (a-1)
+        self.heading += d_heading * (a[0] - 1)
         self.heading += np.random.normal(0, heading_sigma)
         if self.heading > 2*np.pi:
             self.heading -= 2*np.pi
