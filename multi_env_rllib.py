@@ -207,7 +207,7 @@ class AirTrafficGym(MultiAgentEnv):
             elif not conflict:
                 # reward shaping
                 #aircraft.reward += self.reward_shaping_factor / dist_goal
-                aircraft.reward -= 0.1 #-0.001
+                aircraft.reward -= 0 #0.1 #-0.001
 
             reward[aircraft_id] = aircraft.reward
             #if aircraft not in aircraft_to_remove:
