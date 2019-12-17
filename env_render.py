@@ -48,11 +48,13 @@ class AirTrafficGym(MultiAgentEnv):
         self.position_range = spaces.Box(low=np.array([0, 0]),
                                          high=np.array([map_width, map_height]),
                                          dtype=np.float32)
+
         # discrete action space: -1, 0, 1
-        self.action_space = spaces.Tuple((spaces.Discrete(3), spaces.Discrete(3)))
-        # self.action_space = spaces.Tuple((spaces.Box(low=-1, high=1, shape=(2,), dtype=np.float), ) * self.num_agents)
+        # self.action_space = spaces.Tuple((spaces.Discrete(3), spaces.Discrete(3)))
+
         # continuous action space: [-1, 1]
-        # spaces.Box(low=-1, high=1, shape=(2,), dtype=np.float)
+        self.action_space = spaces.Tuple((spaces.Box(low=-1, high=1, shape=(2,), dtype=np.float),))
+
         self.conflicts = 0
         np.random.seed(seed)
         self.np_random, seed = seeding.np_random(seed)
@@ -120,8 +122,6 @@ class AirTrafficGym(MultiAgentEnv):
         # Only step for planes with a provided action given by a.
         lst_airplanes = []
         for action_id in a.keys():
-            print('a', a)
-            print(a[action_id])
             self.aircraft_dict.ac_dict[action_id].step(a[action_id])
             lst_airplanes.append(action_id)
         self.airport.step()
@@ -397,13 +397,19 @@ class Aircraft:
         self.total_lifespan = self.lifespan
 
     def step(self, a):
-        print(a)
-        self.speed += d_speed * (a[1] - 1)
+
+        # DISCRETE
+        # self.speed += d_speed * (a[1] - 1)
+        # self.heading += d_heading * (a[0] - 1)
+
+        # CONTINUOUS
+        self.speed += d_speed * a[0][1]
+        self.heading += d_heading * a[0][0]
+
         self.speed = max(min_speed, min(self.speed, max_speed))
         self.speed += np.random.normal(0, speed_sigma)
 
         # self.heading += d_heading * (a-1)
-        self.heading += d_heading * (a[0] - 1)
         self.heading += np.random.normal(0, heading_sigma)
         if self.heading > 2*np.pi:
             self.heading -= 2*np.pi
