@@ -59,12 +59,11 @@ class AirTrafficGym(MultiAgentEnv):
         self.goals = 0
         self.NMACs = 0
         for i in range(self.num_agents):
-            aircraft = Aircraft(id = str(i),
+            aircraft = Aircraft(id = i,
                                 position = self.random_pos(),
                                 speed = self.random_speed(),
                                 heading = self.random_heading(),
                                 goal_pos = self.airport.position)
-            
             #print("RANDOM HEADING", aircraft.heading)
             #print("Actually random", self.random_heading())
             self.aircraft_dict.add(aircraft)
@@ -74,6 +73,7 @@ class AirTrafficGym(MultiAgentEnv):
 
     def _get_obs(self, lst_airplanes):
         state = {}
+        others_state = {}
         ids = []
         #s = []
         #id = []
@@ -98,6 +98,7 @@ class AirTrafficGym(MultiAgentEnv):
             own_s.append(aircraft.speed)
             own_s.append(aircraft.heading)
             state[aircraft_id] = own_s
+
             # own_s.append(aircraft.prev_a)
             # dist_array, id_array = self.dist_to_all_aircraft(aircraft)
             # closest_ac = np.argsort(dist_array)
@@ -119,16 +120,25 @@ class AirTrafficGym(MultiAgentEnv):
                         own_s.append(0)
 
             '''
-            
+
+        for aircraft_id in lst_airplanes:
+            dtype=[('dist', float), ('id', int)]
+            distances = np.vstack(self.dist_to_all_aircraft(aircraft_id), dtype=dtype)
+            np.sort(distances, axis=0, order='dist')
+            for i in range(2):
+                state[aircraft_id] += state[distances[i,1]][:4]
+
         return state
 
     def step(self, a):
         # Only step for planes with a provided action given by a.
         lst_airplanes = []
+        airplane_prev_pos = {}
+        for action_id in a.keys():
+            airplane_prev_pos[action_id] = self.aircraft_dict.ac_dict[action_id].position
         for action_id in a.keys():
             self.aircraft_dict.ac_dict[action_id].step(a[action_id])
             lst_airplanes.append(action_id)
-            
 
         self.airport.step()
         '''
@@ -141,7 +151,7 @@ class AirTrafficGym(MultiAgentEnv):
             self.airport.generate_interval()
         '''
         obs = self._get_obs(lst_airplanes)
-        reward, done, info = self._terminal_reward(lst_airplanes)
+        reward, done, info = self._terminal_reward(lst_airplanes, airplane_prev_pos)
         if False in done.values():
             done["__all__"] = False
         else:
@@ -149,7 +159,7 @@ class AirTrafficGym(MultiAgentEnv):
 
         return obs, reward, done, info
 
-    def _terminal_reward(self, lst_airplanes):
+    def _terminal_reward(self, lst_airplanes, airplane_prev_pos):
         reward = {}
         dones = {}
         info = {}
@@ -291,8 +301,7 @@ class AirTrafficGym(MultiAgentEnv):
         """
 
         # x, y, speed and heading
-        return spaces.Box(low=np.array([0, 0, min_speed, 0]), high=np.array([map_width, map_height, max_speed, 2 * np.pi]))
-                            
+        return spaces.Box(low=np.array([0, 0, min_speed, 0]*3), high=np.array([map_width, map_height, max_speed, 2 * np.pi]*3))
 
 
 
@@ -387,7 +396,7 @@ class Aircraft:
     def step(self, a):
         # self.speed += d_speed * a[1]
         self.speed = max(min_speed, min(self.speed, max_speed))
-        self.speed += np.random.normal(0, speed_sigma)
+        # self.speed += np.random.normal(0, speed_sigma)
 
         self.heading += d_heading * (a-1)
         # self.heading += d_heading * a[0]
