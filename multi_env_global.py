@@ -12,10 +12,13 @@ from ray.rllib.env.multi_agent_env import MultiAgentEnv
 map_width = 100
 map_height = 100
 diagonal = map_height * math.sqrt(2)
-num_aircraft = 1 # How many aircrafts showing up in the map (list length)
+num_aircraft = 10 # How many aircrafts showing up in the map (list length)
+detect_distance = 2
+airport_radar = True
+
 n_closest = 0
 rwy_degree = 90
-rwy_degree_sigma = math.radians(90)
+rwy_degree_sigma = math.radians(30)
 
 scale = 60  # 1 pixel = 30 meters
 min_speed = 80/scale
@@ -30,7 +33,7 @@ time_interval_lower = 60
 time_interval_upper = 120
 conflict_coeff = 0.005
 minimum_separation = 4
-NMAC_dist = 150/scale
+NMAC_dist = 1
 
 radius = 40
 
@@ -64,7 +67,7 @@ class AirTrafficGym(MultiAgentEnv):
         self.NMACs = 0
         for i in range(self.num_agents):
             random_position = self.random_pos()
-            aircraft = Aircraft(id = str(i),
+            aircraft = Aircraft(id = i,
                                 position = random_position,
                                 speed = self.random_speed(),
                                 heading = self.random_heading(random_position),
@@ -74,7 +77,7 @@ class AirTrafficGym(MultiAgentEnv):
             self.aircraft_dict.add(aircraft)
 
         self.airport.generate_interval()
-        return self._get_obs([str(i) for i in range(self.num_agents)])
+        return self._get_obs([i for i in range(self.num_agents)])
 
     def _get_obs(self, lst_airplanes):
         state = {}
@@ -126,12 +129,47 @@ class AirTrafficGym(MultiAgentEnv):
 
             '''
 
-        for aircraft_id in lst_airplanes:
-            dtype=[('dist', float), ('id', int)]
-            distances = np.vstack(self.dist_to_all_aircraft(aircraft_id), dtype=dtype)
-            np.sort(distances, axis=0, order='dist')
-            for i in range(2):
-                state[aircraft_id] += state[distances[i,1]][:4]
+        if num_aircraft > 1:
+
+            if airport_radar:
+                distances = np.array([[state[i][0]**2 + state[i][1]**2, i] for i in state.keys()])
+                distances = distances[distances[:,0].argsort()]
+                for aircraft_id in lst_airplanes:
+                    for i in range(num_aircraft-1):
+                        if i >= distances.shape[0]:
+                            break
+                        if distances[i,1] not in state.keys():
+                            continue
+                        if distances[i][1] != aircraft_id:
+                            state[aircraft_id] += state[distances[i,1]][:4]
+                    while len(state[aircraft_id]) < 4*num_aircraft:
+                        state[aircraft_id] += [0,0,(max_speed-min_speed)/2+min_speed, np.pi]
+            else:
+                for aircraft_id in lst_airplanes:
+                    distances = np.vstack(self.dist_to_all_aircraft(self.aircraft_dict.ac_dict[aircraft_id])).T
+                    distances = distances[distances[:,0].argsort()]
+                    this_aircraft = state[aircraft_id][:4]
+                    for i in range(num_aircraft-1):
+                        if distances[i,1] not in state.keys():
+                            continue
+                        if distances[i,0] > detect_distance:
+                            break
+                        other_aircraft = state[distances[i,1]][:4]
+
+                        old_other_aircraft1 = other_aircraft[1]
+                        other_aircraft[1]=(other_aircraft[0]-this_aircraft[0])*np.cos(this_aircraft[3]) + (other_aircraft[1]-this_aircraft[1])*np.cos(this_aircraft[3]-np.pi/2)
+                        other_aircraft[0]=(other_aircraft[0]-this_aircraft[0])*np.cos(this_aircraft[3]-np.pi/2) + (old_other_aircraft1-this_aircraft[1])*np.cos(this_aircraft[3])
+
+                        other_aircraft[3] = state[aircraft_id][3]-other_aircraft[3]
+                        if other_aircraft[3] < 0:
+                            other_aircraft[3] += 2*np.pi
+                        elif other_aircraft[3] > 2*np.pi:
+                            other_aircraft[3] -= 2*np.pi
+
+                        state[aircraft_id] += other_aircraft
+                        # state[aircraft_id] += state[distances[i,1]][:4]
+                    while len(state[aircraft_id]) < 4*num_aircraft:
+                        state[aircraft_id] += [0,0,(max_speed-min_speed)/2 + min_speed, np.pi]
 
         return state
 
@@ -174,7 +212,11 @@ class AirTrafficGym(MultiAgentEnv):
         for aircraft_id in lst_airplanes:
             aircraft = self.aircraft_dict.ac_dict[aircraft_id]
             dist_array, id_array = self.dist_to_all_aircraft(aircraft)
-            min_dist = min(dist_array) if dist_array.shape[0] > 0 else 9999
+            min_dist = 9999
+            for i in range(len(dist_array)):
+                if id_array[i] in lst_airplanes:
+                    min_dist = dist_array[i]
+                    break
             dist_goal = self.dist_2pt(aircraft.position, self.airport.position)
             aircraft.reward = 0
             conflict = False
@@ -312,7 +354,9 @@ class AirTrafficGym(MultiAgentEnv):
         """
 
         # x, y, speed and heading
-        return spaces.Box(low=np.array([0, 0, min_speed, 0]*3), high=np.array([map_width, map_height, max_speed, 2 * np.pi]*3))
+        max_dist = 1.2*np.sqrt(map_width**2 + map_height**2)
+        # return spaces.Box(low=np.array([0, 0, min_speed, 0]*6), high=np.array([map_width, map_height, max_speed, 2 * np.pi]*6))
+        return spaces.Box(low=np.array([0, 0, min_speed, 0] + (num_aircraft-1)*[-max_dist,-max_dist,min_speed,0]), high=np.array([map_width, map_height, max_speed, 2 * np.pi] + (num_aircraft-1)*[max_dist,max_dist,max_speed,2*np.pi]))
 
 
 
@@ -401,7 +445,7 @@ class Aircraft:
         
 
         self.conflict_id_set = set()
-        self.lifespan = 1000
+        self.lifespan = 10000
         self.total_lifespan = self.lifespan
 
     def step(self, a):

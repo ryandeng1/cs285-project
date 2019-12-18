@@ -6,7 +6,7 @@ from stable_baselines import PPO2, A2C
 
 
 import gym
-import multi_env_rllib
+import multi_env_global
 import ray
 from ray import tune
 from ray.rllib.policy import Policy
@@ -27,7 +27,7 @@ def policy_mapping_fn(agent_id):
 	return "dqn_policy"
 
 
-env = multi_env_rllib.AirTrafficGym(seed=0, num_agents=2)
+env = multi_env_global.AirTrafficGym(seed=0, num_agents=10)
 register_env("multi_air-v0", lambda c: env)
 
 num_train_itr = 2500
@@ -58,3 +58,4 @@ for i in range(num_train_itr):
         print("****************************Iteration: ", i, "****************************")
         print(pretty_print(x))
 
+trainer.save()
